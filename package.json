@@ -1,0 +1,43 @@
+{
+    "name": "code-gate",
+    "version": "0.1.0",
+    "description": "Local code quality gate. Runs Prettier, ESLint, TypeScript, tests and build before every git push, and blocks the push when a required check fails.",
+    "keywords": [
+        "git",
+        "pre-push",
+        "hook",
+        "lint",
+        "prettier",
+        "eslint",
+        "typescript",
+        "quality-gate",
+        "cli"
+    ],
+    "license": "MIT",
+    "bin": {
+        "code-gate": "dist/cli.js"
+    },
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+        "pretest": "node -e \"require('fs').rmSync('tmp',{recursive:true,force:true})\" && npm run build",
+        "dev": "tsc -p tsconfig.json --watch",
+        "prepublishOnly": "npm run clean && npm run build",
+        "test": "node --test",
+        "typecheck": "tsc -p tsconfig.json --noEmit"
+    },
+    "devDependencies": {
+        "@types/node": "20.14.10",
+        "typescript": "7.0.2"
+    }
+}
