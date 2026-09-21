@@ -9,7 +9,7 @@ const { parsePrePushStdin, getWorkingChanges } = require('../dist/git/git');
 const { installPrePushHook, uninstallPrePushHook, readInstalledHook, hookPathFor } = require('../dist/hook/install');
 const { HOOK_MARKER } = require('../dist/hook/template');
 const { applyIgnore, chunkFiles, filterByExtension, findScript } = require('../dist/checks/helpers');
-const { git, initRepo, makeDir, write, writeJson } = require('./helpers');
+const { git, initRepo, makeDir, makeExternalDir, write, writeJson } = require('./helpers');
 
 test('pre-push stdin lines are parsed into refs', () => {
     const input = [
@@ -121,9 +121,14 @@ test('uninstall removes only hooks we manage', () => {
 });
 
 test('installing outside a git repository is reported, not crashed', () => {
-    const dir = makeDir('hook-no-repo');
-    const result = installPrePushHook(dir);
-    assert.equal(result.action, 'blocked');
+    // Deliberately outside this repo: a non-repo fixture inside it would
+    // resolve upwards and write into code-gate's own .git/hooks.
+    const dir = makeExternalDir('hook-no-repo');
+
+    assert.equal(hookPathFor(dir), undefined, 'must not resolve a hooks dir outside a repo');
+    assert.equal(installPrePushHook(dir).action, 'blocked');
+
+    fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('files are filtered by extension', () => {

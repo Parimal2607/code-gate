@@ -18,8 +18,10 @@ git push
 ## Install
 
 ```bash
-npm install -g code-gate
+npm install -g @prmvx/code-gate
 ```
+
+The binary is called `code-gate`. Note the scope: the unscoped `code-gate` on npm is a different project.
 
 Then, once per repository:
 
@@ -33,7 +35,7 @@ That installs a `pre-push` hook. From then on `git push` runs the gate automatic
 You can also install it per project, which is what teams usually want, because the hook prefers a local install:
 
 ```bash
-npm install --save-dev code-gate
+npm install --save-dev @prmvx/code-gate
 npx code-gate init
 ```
 
@@ -89,6 +91,17 @@ $ eslint 3 file(s)
   src/components/UserCard.tsx
     42:5  error  'user' is assigned a value but never used  no-unused-vars
 
+Prettier output:
+$ prettier --check 3 file(s)
+
+  src/components/Card.tsx
+       12 - <div   className="wrapper"   >
+          - <span>hello</span>
+          + <div className="wrapper">
+          +     <span>hello</span>
+
+Fix with: npx prettier --write src/components/Card.tsx
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         ✗ PUSH BLOCKED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -100,6 +113,14 @@ Bypass in an emergency: git push --no-verify
 ```
 
 Status markers: `✓` pass, `✗` fail, `⚠` warning (never blocks), `-` not applicable.
+
+### Failure detail
+
+Every failure reports a file and a line number:
+
+- **ESLint** and **TypeScript** already do, so their output is passed through with the project root trimmed off the paths.
+- **Prettier** only prints file names, so code-gate re-formats each failing file in memory and diffs it against what is on disk, showing the line number, the current lines (`-`) and what Prettier would write (`+`), plus a ready-to-run `prettier --write` command.
+- Differences that a diff cannot show are named explicitly: `line endings: file uses CRLF, Prettier expects LF` and `end of file: missing newline at the end`.
 
 ## What gets checked
 
@@ -159,9 +180,11 @@ CODE_GATE_SKIP=1 git push     # skip only code-gate
 `code-gate init` writes a POSIX `sh` script to the repository's hooks directory. It resolves `core.hooksPath` first (so it cooperates with husky) and `--git-common-dir` (so linked worktrees install into the main repo). The script:
 
 1. exits early when `CODE_GATE_SKIP=1`
-2. prefers `./node_modules/.bin/code-gate`, then the global `code-gate`
+2. resolves the CLI in this order: `./node_modules/.bin/code-gate`, then the absolute path recorded when `init` ran, then `code-gate` on `PATH`
 3. runs `code-gate check --hook pre-push --remote <remote>`
-4. blocks the push with a clear message when neither binary exists, since an unverifiable push is not a verified push (set `CODE_GATE_OPTIONAL=1` to downgrade that to a warning)
+4. blocks the push with a clear message when none of those exist, since an unverifiable push is not a verified push (set `CODE_GATE_OPTIONAL=1` to downgrade that to a warning)
+
+The recorded absolute path matters because `code-gate` is a common binary name: without it, a different globally installed package with the same binary name can hijack the hook. The recorded path is skipped when the file does not exist, so a committed hook still works on a teammate's machine.
 
 An existing hook written by code-gate is upgraded in place. An unrelated existing hook is left alone unless you pass `--force`, which backs it up to `pre-push.backup` first.
 
@@ -267,6 +290,7 @@ src/
     runner.ts             the orchestrator: detect -> select -> run -> collect
     types.ts              shared types
     exec.ts               child process helper, never throws
+    diff.ts               line diff behind Prettier's line numbers
     report.ts             terminal output
     ui.ts                 colors, symbols, ASCII fallback
     json.ts               JSON-with-comments parsing
@@ -279,6 +303,7 @@ src/
   checks/
     index.ts              check registry and order
     prettier.ts           prettier --check
+    prettierReport.ts     turns failing files into line-numbered diffs
     eslint.ts             eslint
     typescript.ts         tsc --noEmit
     script.ts             tests and build (package.json scripts)

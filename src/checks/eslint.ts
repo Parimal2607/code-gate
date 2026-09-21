@@ -10,6 +10,21 @@ import { applyIgnore, chunkFiles, ESLINT_EXTENSIONS, filterByExtension, result, 
  * project has no ESLint config at all the check is reported as not applicable
  * instead of failing the push.
  */
+/**
+ * ESLint prints absolute file paths. Trim the project root so the report reads
+ * like `src/components/Card.tsx` instead of a 90 character path.
+ */
+function relativizePaths(output: string, root: string): string {
+    const variants = [root + '\\', root + '/', root];
+    let result = output;
+
+    for (const variant of variants) {
+        result = result.split(variant).join('');
+    }
+
+    return result;
+}
+
 export const eslintCheck: Check = {
     id: 'eslint',
     name: 'ESLint',
@@ -77,7 +92,7 @@ export const eslintCheck: Check = {
                 ...base,
                 status: 'fail',
                 message: fatal ? `ESLint could not run (config: ${configLabel})` : `Lint errors found (config: ${configLabel})`,
-                output: truncateOutput(output),
+                output: truncateOutput(relativizePaths(output, ctx.project.root)),
                 command: lastCommand,
             });
         }

@@ -2,6 +2,7 @@ import { exec } from '../core/exec';
 import type { Check, CheckContext, CheckResult } from '../core/types';
 import { toolCommand } from '../detect/packages';
 import { applyIgnore, chunkFiles, filterByExtension, PRETTIER_EXTENSIONS, result, truncateOutput } from './helpers';
+import { describeFormattingIssues, parseCheckOutput } from './prettierReport';
 
 /**
  * Runs `prettier --check` on the changed files.
@@ -43,8 +44,9 @@ export const prettierCheck: Check = {
               : 'no config file, using Prettier defaults';
 
         let failed = false;
-        let output = '';
+        let rawOutput = '';
         let lastCommand = '';
+        const failingFiles: string[] = [];
 
         for (const chunk of chunkFiles(candidates)) {
             const args = ['--check', '--no-color', ...chunk];
@@ -66,16 +68,33 @@ export const prettierCheck: Check = {
 
             if (run.code !== 0) {
                 failed = true;
-                output += run.combined;
+                rawOutput += run.combined;
+                failingFiles.push(...parseCheckOutput(run.combined, chunk));
             }
         }
 
         if (failed) {
+            // `prettier --check` only names files, so re-format each one in
+            // memory to report the exact lines that differ.
+            const detailed = await describeFormattingIssues({
+                tool,
+                root: ctx.project.root,
+                files: failingFiles,
+                env: ctx.childEnv,
+            });
+
+            const fixHint =
+                failingFiles.length > 0
+                    ? `\nFix with: npx prettier --write ${failingFiles.slice(0, 5).join(' ')}${
+                          failingFiles.length > 5 ? ' ...' : ''
+                      }`
+                    : '';
+
             return result({
                 ...base,
                 status: 'fail',
-                message: `Formatting issues found (${configLabel})`,
-                output: truncateOutput(output),
+                message: `${failingFiles.length || 'some'} file(s) need formatting (${configLabel})`,
+                output: detailed ? `${truncateOutput(detailed, 120)}${fixHint}` : truncateOutput(rawOutput),
                 command: lastCommand,
             });
         }

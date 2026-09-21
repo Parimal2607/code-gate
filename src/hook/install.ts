@@ -4,6 +4,16 @@ import path from 'node:path';
 import { getHooksDir } from '../git/git';
 import { HOOK_MARKER, renderPrePushHook } from './template';
 
+/**
+ * Absolute path to this installation's CLI entry point, baked into the hook so
+ * it cannot accidentally run a different package that happens to publish a
+ * `code-gate` binary.
+ */
+export function resolveCliPath(): string | undefined {
+    const candidate = path.resolve(__dirname, '..', 'cli.js');
+    return fs.existsSync(candidate) ? candidate : undefined;
+}
+
 export type HookAction = 'created' | 'updated' | 'unchanged' | 'replaced' | 'blocked';
 
 export interface InstallHookResult {
@@ -23,13 +33,22 @@ export function isCodeGateHook(contents: string): boolean {
     return contents.includes(HOOK_MARKER) || /\bcode-gate\b/.test(contents);
 }
 
-/** True when a pre-push hook installed by code-gate is present and executable. */
-export function readInstalledHook(cwd: string): { exists: boolean; managed: boolean; hookPath?: string } {
+/** True when a pre-push hook installed by code-gate is present and up to date. */
+export function readInstalledHook(cwd: string): {
+    exists: boolean;
+    managed: boolean;
+    /** False when the hook was written by an older version of code-gate. */
+    current: boolean;
+    hookPath?: string;
+} {
     const hookPath = hookPathFor(cwd);
-    if (!hookPath || !fs.existsSync(hookPath)) return { exists: false, managed: false, hookPath };
+    if (!hookPath || !fs.existsSync(hookPath)) return { exists: false, managed: false, current: false, hookPath };
 
     const contents = fs.readFileSync(hookPath, 'utf8');
-    return { exists: true, managed: isCodeGateHook(contents), hookPath };
+    const managed = isCodeGateHook(contents);
+    const current = managed && contents === renderPrePushHook({ cliPath: resolveCliPath() });
+
+    return { exists: true, managed, current, hookPath };
 }
 
 export function installPrePushHook(cwd: string, options: { force?: boolean } = {}): InstallHookResult {
@@ -38,7 +57,7 @@ export function installPrePushHook(cwd: string, options: { force?: boolean } = {
 
     fs.mkdirSync(path.dirname(hookPath), { recursive: true });
 
-    const desired = renderPrePushHook();
+    const desired = renderPrePushHook({ cliPath: resolveCliPath() });
     let backupPath: string | undefined;
     let action: HookAction = 'created';
 

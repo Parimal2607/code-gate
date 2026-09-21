@@ -101,13 +101,15 @@ export async function doctorCommand(options: { cwd: string; verbose?: boolean })
             detail: buildScript ? `${buildScript.name}: ${buildScript.value}` : 'not configured',
         },
         {
-            status: hook.exists ? (hook.managed ? 'pass' : 'warn') : 'fail',
+            status: hook.exists ? (hook.managed && hook.current ? 'pass' : 'warn') : 'fail',
             label: 'pre-push hook',
-            detail: hook.exists
-                ? hook.managed
+            detail: !hook.exists
+                ? 'not installed - run `code-gate init`'
+                : !hook.managed
+                  ? `exists but not managed by code-gate (${hook.hookPath})`
+                  : hook.current
                     ? (hook.hookPath as string)
-                    : `exists but not managed by code-gate (${hook.hookPath})`
-                : 'not installed - run `code-gate init`',
+                    : `outdated, re-run \`code-gate init\` (${hook.hookPath})`,
         },
         {
             status: config.configPath ? 'pass' : 'skip',

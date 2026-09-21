@@ -1,7 +1,7 @@
 {
-    "name": "code-gate",
-    "version": "0.1.0",
-    "description": "Local code quality gate. Runs Prettier, ESLint, TypeScript, tests and build before every git push, and blocks the push when a required check fails.",
+    "name": "@prmvx/code-gate",
+    "version": "1.1.0",
+    "description": "Global code quality gate",
     "keywords": [
         "git",
         "pre-push",
@@ -39,5 +39,13 @@
     "devDependencies": {
         "@types/node": "20.14.10",
         "typescript": "7.0.2"
-    }
+    },
+    "directories": {
+        "test": "test"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git@github-personal:Parimal2607/code-gate.git"
+    },
+    "author": ""
 }
